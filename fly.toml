@@ -1,4 +1,4 @@
-app            = "tera5g"
+app            = "tera5g-hs5d13"
 primary_region = "iad"
 
 [build]
