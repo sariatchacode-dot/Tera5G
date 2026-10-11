@@ -1,0 +1,11 @@
+.git
+.claude
+**/.env
+**/.env.local
+**/node_modules
+server/dist
+server/public
+mobile/dist
+mobile/.expo
+web/dist
+*.md

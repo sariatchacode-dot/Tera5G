@@ -6,7 +6,7 @@ class Store {
   scores: Map<string, ScoreEntry> = new Map()
   teamActivity: Map<string, number> = new Map() // teamId → last relay timestamp
   firewallMode: FirewallMode = 'vulnerable'
-  readonly adminKey = 'tera5g-admin-2024'
+  readonly adminKey = process.env.ADMIN_KEY ?? 'tera5g-admin-2024'
   firstRelayTeamId: string | null = null
 
   getTeam(id: string): Team | undefined {
