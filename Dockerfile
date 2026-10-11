@@ -12,8 +12,16 @@ WORKDIR /build
 RUN apk add --no-cache git
 ENV CI=1
 ENV NODE_OPTIONS="--max-old-space-size=2048"
+
 COPY mobile/package*.json mobile/
 RUN cd mobile && npm install
+
+# react-native-webview has no web implementation — its index.js crashes Node
+# before Metro can apply any resolver. Replace it with a no-op stub so the
+# web export can proceed. connect.web.tsx uses an iframe instead of WebView.
+RUN printf 'const React=require("react");const {View}=require("react-native");\nfunction WebView(p){return React.createElement(View,p)}\nmodule.exports=WebView;\nmodule.exports.WebView=WebView;\nmodule.exports.default=WebView;\n' \
+    > mobile/node_modules/react-native-webview/index.js
+
 COPY mobile/ mobile/
 RUN cd mobile && npx expo export --platform web
 
