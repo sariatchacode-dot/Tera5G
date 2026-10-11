@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Tera5G",
+    "slug": "tera5g",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "tera5g",
+    "backgroundColor": "#050b14",
+    "splash": {
+      "backgroundColor": "#050b14"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.pentaghost.tera5g"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#050b14"
+      },
+      "package": "com.pentaghost.tera5g"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "react-native-webview",
+        {
+          "android": {
+            "allowsInlineMediaPlayback": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

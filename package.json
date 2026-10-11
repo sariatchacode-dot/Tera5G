@@ -1,0 +1,15 @@
+{
+  "name": "tera5g-platform",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:server && npm run build:app && node scripts/copy-web-build.js",
+    "build:server": "cd server && npm ci && npm run build",
+    "build:app": "cd mobile && npm ci && npx expo export --platform web",
+    "start": "node server/dist/index.js",
+    "dev:server": "cd server && npm run dev",
+    "dev:app": "cd mobile && npx expo start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

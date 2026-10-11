@@ -1,0 +1,9 @@
+node_modules/
+server/dist/
+server/public/
+mobile/dist/
+mobile/.expo/
+mobile/node_modules/
+.env
+.env.local
+.claude/
