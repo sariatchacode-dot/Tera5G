@@ -198,6 +198,12 @@ h1{color:#ff4444;margin:0 0 16px}p{color:#8090b0;font-size:13px;line-height:1.6}
 
     const ct = proxyRes.headers['content-type'] ?? 'application/octet-stream'
 
+    // Strip headers that block iframe embedding
+    delete proxyRes.headers['x-frame-options']
+    delete proxyRes.headers['content-security-policy']
+    delete proxyRes.headers['content-security-policy-report-only']
+    delete proxyRes.headers['x-content-type-options']
+
     if (ct.includes('text/html')) {
       let body = ''
       proxyRes.setEncoding('utf8')
@@ -205,7 +211,6 @@ h1{color:#ff4444;margin:0 0 16px}p{color:#8090b0;font-size:13px;line-height:1.6}
       proxyRes.on('end', () => {
         const patched = injectBase(body, targetUrl.origin)
 
-        // Log real relay traffic
         const entry = {
           id: uuidv4(),
           timestamp: Date.now(),
@@ -226,7 +231,6 @@ h1{color:#ff4444;margin:0 0 16px}p{color:#8090b0;font-size:13px;line-height:1.6}
         if (store.trafficLog.length > 1000) store.trafficLog.shift()
         io.emit('traffic', entry)
 
-        // Update live activity + scoring
         store.teamActivity.set(team.id, Date.now())
         awardRelayRequest(team.id)
         awardFirstRelay(team.id)
@@ -236,6 +240,7 @@ h1{color:#ff4444;margin:0 0 16px}p{color:#8090b0;font-size:13px;line-height:1.6}
         res.status(proxyRes.statusCode ?? 200)
           .set('Content-Type', 'text/html; charset=utf-8')
           .set('X-Tera5G-Via', `tunnel:${hostname}`)
+          .set('X-Frame-Options', 'ALLOWALL')
           .send(patched)
       })
     } else {
