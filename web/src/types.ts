@@ -51,3 +51,15 @@ export interface ActiveTeamInfo {
   activeSeconds: number
   requestCount: number
 }
+
+export interface BrowserState {
+  teamId: string
+  teamName: string
+  teamColor: string
+  url: string
+  title: string
+  loading: boolean
+  lastUpdated: number
+  locked: boolean
+  online: boolean
+}

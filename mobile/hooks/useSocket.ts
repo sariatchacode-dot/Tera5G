@@ -21,6 +21,9 @@ interface SocketState {
   scores: ScoreEntry[]
   connected: boolean
   alert: string | null
+  adminPushUrl: string | null
+  browserLocked: boolean
+  kicked: boolean
 }
 
 export function useSocket() {
@@ -30,6 +33,9 @@ export function useSocket() {
     scores: [],
     connected: false,
     alert: null,
+    adminPushUrl: null,
+    browserLocked: false,
+    kicked: false,
   })
 
   useEffect(() => {
@@ -50,6 +56,19 @@ export function useSocket() {
     socket.on('firewall_vulnerable', ({ message }: { message: string }) =>
       setState(s => ({ ...s, alert: message }))
     )
+    // Admin commands
+    socket.on('admin:push_url', ({ url }: { url: string }) =>
+      setState(s => ({ ...s, adminPushUrl: url }))
+    )
+    socket.on('admin:announce', ({ message }: { message: string; type?: string }) =>
+      setState(s => ({ ...s, alert: message }))
+    )
+    socket.on('admin:lock', ({ locked }: { locked: boolean }) =>
+      setState(s => ({ ...s, browserLocked: locked }))
+    )
+    socket.on('admin:kicked', ({ message }: { message: string }) =>
+      setState(s => ({ ...s, kicked: true, alert: message }))
+    )
 
     return () => { socket.disconnect() }
   }, [])
@@ -58,5 +77,17 @@ export function useSocket() {
     setState(s => ({ ...s, alert: null }))
   }
 
-  return { ...state, clearAlert }
+  function clearAdminPush() {
+    setState(s => ({ ...s, adminPushUrl: null }))
+  }
+
+  function emitBrowserRegister(teamId: string) {
+    socketRef.current?.emit('browser:register', { teamId })
+  }
+
+  function emitBrowserState(data: { teamId: string; url: string; title: string; loading: boolean }) {
+    socketRef.current?.emit('browser:state', data)
+  }
+
+  return { ...state, clearAlert, clearAdminPush, emitBrowserRegister, emitBrowserState }
 }

@@ -22,7 +22,11 @@ export default function BrowserTab() {
   const { teamId, teamName, teamColor } = useLocalSearchParams<{
     teamId: string; teamName: string; teamColor: string
   }>()
-  const { firewallMode, scores, connected, alert, clearAlert } = useSocket()
+  const {
+    firewallMode, scores, connected, alert, clearAlert,
+    adminPushUrl, clearAdminPush, emitBrowserRegister, emitBrowserState,
+    browserLocked, kicked,
+  } = useSocket()
 
   const [inputUrl, setInputUrl] = useState('https://httpbin.org/get')
   const [relayUrl, setRelayUrl] = useState(buildRelay('https://httpbin.org/get', teamId ?? ''))
@@ -32,9 +36,31 @@ export default function BrowserTab() {
   const myScore = scores.find(s => s.teamId === teamId)
   const bypassing = firewallMode === 'vulnerable'
 
+  // Register with server whenever socket connects
+  useEffect(() => {
+    if (connected && teamId) emitBrowserRegister(teamId)
+  }, [connected, teamId])
+
+  // Report browser state to admin (debounced)
+  useEffect(() => {
+    if (!connected || !teamId) return
+    const t = setTimeout(() => {
+      emitBrowserState({ teamId, url: inputUrl, title: '', loading })
+    }, 400)
+    return () => clearTimeout(t)
+  }, [inputUrl, loading, connected, teamId])
+
+  // Admin: navigate browser to pushed URL
+  useEffect(() => {
+    if (adminPushUrl) {
+      navigate(adminPushUrl)
+      clearAdminPush()
+    }
+  }, [adminPushUrl])
+
   function navigate(url: string) {
     const clean = url.trim()
-    if (!clean) return
+    if (!clean || browserLocked) return
     const full = clean.startsWith('http') ? clean : `https://${clean}`
     setInputUrl(full)
     setRelayUrl(buildRelay(full, teamId ?? ''))
@@ -52,27 +78,44 @@ export default function BrowserTab() {
         doc.addEventListener('click', (e) => {
           const el = (e.target as HTMLElement).closest('a') as HTMLAnchorElement | null
           if (!el?.href) return
-          if (el.href.startsWith('http://') || el.href.startsWith('https://')) {
+          if ((el.href.startsWith('http://') || el.href.startsWith('https://')) && !browserLocked) {
             e.preventDefault()
             navigate(el.href)
           }
         })
       } catch {
-        // cross-origin — user navigates via URL bar
+        // cross-origin
       }
     }
     iframe.addEventListener('load', onLoad)
     return () => iframe.removeEventListener('load', onLoad)
-  }, [relayUrl, teamId])
+  }, [relayUrl, teamId, browserLocked])
 
   return (
     <View style={styles.container}>
-      {/* Alert */}
+      {/* Kicked overlay */}
+      {kicked && (
+        <View style={styles.kickedOverlay}>
+          <Ionicons name="ban-outline" size={52} color={C.red} />
+          <Text style={styles.kickedTitle}>Session Ended</Text>
+          <Text style={styles.kickedBody}>The admin has ended your session.</Text>
+        </View>
+      )}
+
+      {/* Alert banner */}
       {alert && (
         <TouchableOpacity style={styles.alertBanner} onPress={clearAlert}>
           <Ionicons name="warning-outline" size={13} color={C.yellow} />
           <Text style={styles.alertText}>{alert}</Text>
         </TouchableOpacity>
+      )}
+
+      {/* Locked banner */}
+      {browserLocked && (
+        <View style={styles.lockedBanner}>
+          <Ionicons name="lock-closed" size={11} color={C.yellow} />
+          <Text style={styles.lockedText}>Browser locked by admin</Text>
+        </View>
       )}
 
       {/* Status bar */}
@@ -114,8 +157,12 @@ export default function BrowserTab() {
 
       {/* URL bar */}
       <View style={styles.urlBar}>
-        <View style={styles.urlInputWrapper}>
-          <Ionicons name="lock-closed-outline" size={12} color={C.muted} />
+        <View style={[styles.urlInputWrapper, browserLocked && styles.urlInputLocked]}>
+          <Ionicons
+            name={browserLocked ? 'lock-closed' : 'lock-closed-outline'}
+            size={12}
+            color={browserLocked ? C.yellow : C.muted}
+          />
           <TextInput
             style={styles.urlInput}
             value={inputUrl}
@@ -127,9 +174,14 @@ export default function BrowserTab() {
             // @ts-ignore
             autoCapitalize="none"
             autoCorrect={false}
+            editable={!browserLocked}
           />
         </View>
-        <TouchableOpacity style={styles.goBtn} onPress={() => navigate(inputUrl)}>
+        <TouchableOpacity
+          style={[styles.goBtn, browserLocked && styles.goBtnDisabled]}
+          onPress={browserLocked ? undefined : () => navigate(inputUrl)}
+          disabled={browserLocked}
+        >
           {loading
             ? <ActivityIndicator size="small" color="#000000" />
             : <Text style={styles.goBtnText}>Go</Text>
@@ -138,26 +190,24 @@ export default function BrowserTab() {
       </View>
 
       {/* Presets */}
-      <View style={styles.presets}>
-        {PRESET_SITES.map(s => (
-          <TouchableOpacity key={s.url} style={styles.presetChip} onPress={() => navigate(s.url)}>
-            <Text style={styles.presetText}>{s.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {!browserLocked && (
+        <View style={styles.presets}>
+          {PRESET_SITES.map(s => (
+            <TouchableOpacity key={s.url} style={styles.presetChip} onPress={() => navigate(s.url)}>
+              <Text style={styles.presetText}>{s.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
-      {/* The iframe browser */}
+      {/* Iframe browser */}
       {/* @ts-ignore */}
       <iframe
         ref={iframeRef}
         src={relayUrl}
         style={{
-          flex: 1,
-          width: '100%',
-          border: 'none',
-          backgroundColor: C.bg,
-          display: 'flex',
-        } as any}
+          flex: 1, width: '100%', border: 'none', backgroundColor: C.bg, display: 'flex',
+        } as object}
         onLoad={() => setLoading(false)}
         onError={() => setLoading(false)}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -170,6 +220,14 @@ export default function BrowserTab() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
 
+  kickedOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100,
+    backgroundColor: C.bg,
+    alignItems: 'center', justifyContent: 'center', gap: 12,
+  },
+  kickedTitle: { color: C.text, fontSize: 20, fontWeight: '700', fontFamily: F },
+  kickedBody: { color: C.sub, fontSize: 14, fontFamily: F, textAlign: 'center' },
+
   alertBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: C.yellowBg,
@@ -177,6 +235,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8,
   },
   alertText: { flex: 1, color: C.yellow, fontSize: 12, fontFamily: F },
+
+  lockedBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: 'rgba(255,159,10,0.10)',
+    borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,159,10,0.3)',
+    paddingHorizontal: 14, paddingVertical: 6,
+  },
+  lockedText: { color: C.yellow, fontSize: 11, fontWeight: '600', fontFamily: F },
 
   statusRow: {
     flexDirection: 'row', gap: 6, flexWrap: 'wrap',
@@ -205,6 +271,10 @@ const styles = StyleSheet.create({
     borderRadius: R.input,
     paddingHorizontal: 12, paddingVertical: 9,
   },
+  urlInputLocked: {
+    borderColor: 'rgba(255,159,10,0.4)',
+    backgroundColor: 'rgba(255,159,10,0.06)',
+  },
   urlInput: {
     flex: 1, color: C.text, fontSize: 13, fontFamily: F,
     // @ts-ignore
@@ -215,6 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 9,
     minWidth: 52, alignItems: 'center',
   },
+  goBtnDisabled: { opacity: 0.4 },
   goBtnText: { color: '#000000', fontWeight: '700', fontSize: 13, fontFamily: F },
 
   presets: {

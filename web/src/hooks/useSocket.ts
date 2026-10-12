@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { FirewallMode, TrafficEntry, ScoreEntry, ActiveTeamInfo } from '../types'
+import { FirewallMode, TrafficEntry, ScoreEntry, ActiveTeamInfo, BrowserState } from '../types'
 
 const SERVER = import.meta.env.VITE_SERVER_URL ?? (import.meta.env.DEV ? 'http://localhost:3001' : '')
 
@@ -9,6 +9,7 @@ interface SocketState {
   scores: ScoreEntry[]
   traffic: TrafficEntry[]
   activeSessions: ActiveTeamInfo[]
+  browserStates: BrowserState[]
   alert: { type: 'patched' | 'vulnerable'; message: string } | null
   connected: boolean
 }
@@ -20,6 +21,7 @@ export function useSocket() {
     scores: [],
     traffic: [],
     activeSessions: [],
+    browserStates: [],
     alert: null,
     connected: false,
   })
@@ -50,6 +52,27 @@ export function useSocket() {
     )
     socket.on('firewall_vulnerable', ({ message }: { message: string }) =>
       setState(s => ({ ...s, alert: { type: 'vulnerable', message } }))
+    )
+    // Browser management events
+    socket.on('browser_states', (states: BrowserState[]) =>
+      setState(s => ({ ...s, browserStates: states }))
+    )
+    socket.on('browser_state_update', (updated: BrowserState) =>
+      setState(s => {
+        const exists = s.browserStates.some(b => b.teamId === updated.teamId)
+        return {
+          ...s,
+          browserStates: exists
+            ? s.browserStates.map(b => b.teamId === updated.teamId ? updated : b)
+            : [...s.browserStates, updated],
+        }
+      })
+    )
+    socket.on('team_kicked', ({ teamId }: { teamId: string }) =>
+      setState(s => ({
+        ...s,
+        browserStates: s.browserStates.filter(b => b.teamId !== teamId),
+      }))
     )
 
     return () => { socket.disconnect() }

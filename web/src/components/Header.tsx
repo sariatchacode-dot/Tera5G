@@ -1,4 +1,4 @@
-import { Wifi, WifiOff, ShieldCheck, ShieldAlert, Radio, Trophy, Info, LayoutDashboard } from 'lucide-react'
+import { Wifi, WifiOff, ShieldCheck, ShieldAlert, Radio, Trophy, Info, LayoutDashboard, Monitor } from 'lucide-react'
 import { FirewallMode } from '../types'
 import { Section } from '../App'
 
@@ -6,19 +6,21 @@ interface Props {
   firewallMode: FirewallMode
   connected: boolean
   activeSessions: number
+  onlineBrowsers: number
   activeSection: Section
   onNavigate: (s: Section) => void
 }
 
 const NAV_ITEMS: { icon: React.ElementType; label: string; section: Section }[] = [
-  { icon: LayoutDashboard, label: 'Dashboard', section: 'dashboard' },
-  { icon: Radio,           label: 'Traffic',   section: 'traffic'   },
-  { icon: Trophy,          label: 'Leaderboard', section: 'leaderboard' },
-  { icon: ShieldAlert,     label: 'Firewall',  section: 'firewall'  },
-  { icon: Info,            label: 'JA3',       section: 'ja3'       },
+  { icon: Monitor,        label: 'Browsers',    section: 'browsers'    },
+  { icon: LayoutDashboard,label: 'Dashboard',   section: 'dashboard'   },
+  { icon: Radio,          label: 'Traffic',     section: 'traffic'     },
+  { icon: Trophy,         label: 'Leaderboard', section: 'leaderboard' },
+  { icon: ShieldAlert,    label: 'Firewall',    section: 'firewall'    },
+  { icon: Info,           label: 'JA3',         section: 'ja3'         },
 ]
 
-export function Sidebar({ firewallMode, connected, activeSessions, activeSection, onNavigate }: Props) {
+export function Sidebar({ firewallMode, connected, activeSessions, onlineBrowsers, activeSection, onNavigate }: Props) {
   const isVulnerable = firewallMode === 'vulnerable'
 
   return (
@@ -74,24 +76,37 @@ export function Sidebar({ firewallMode, connected, activeSessions, activeSection
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           <div
             className="flex flex-col items-center rounded-ios py-2"
             style={{ backgroundColor: 'rgba(84,84,88,0.12)', border: '0.5px solid rgba(84,84,88,0.36)' }}
           >
-            <span className="text-base font-bold text-tera-text leading-none">{activeSessions}</span>
-            <span className="text-xs text-tera-muted mt-0.5">active</span>
+            <span className="text-sm font-bold text-tera-text leading-none">{activeSessions}</span>
+            <span className="text-xs text-tera-muted mt-0.5" style={{ fontSize: 10 }}>relaying</span>
           </div>
           <div
-            className="flex items-center justify-center gap-1.5 rounded-ios py-2"
+            className="flex flex-col items-center rounded-ios py-2"
+            style={{
+              backgroundColor: onlineBrowsers > 0 ? 'rgba(10,132,255,0.08)' : 'rgba(84,84,88,0.12)',
+              border: `0.5px solid ${onlineBrowsers > 0 ? 'rgba(10,132,255,0.36)' : 'rgba(84,84,88,0.36)'}`,
+            }}
+          >
+            <span
+              className="text-sm font-bold leading-none"
+              style={{ color: onlineBrowsers > 0 ? '#0A84FF' : '#636366' }}
+            >{onlineBrowsers}</span>
+            <span className="text-xs text-tera-muted mt-0.5" style={{ fontSize: 10 }}>browsers</span>
+          </div>
+          <div
+            className="flex items-center justify-center gap-1 rounded-ios py-2"
             style={{ backgroundColor: 'rgba(84,84,88,0.12)', border: '0.5px solid rgba(84,84,88,0.36)' }}
           >
             {connected
-              ? <Wifi size={12} className="text-tera-green" />
-              : <WifiOff size={12} className="text-tera-red" />
+              ? <Wifi size={11} className="text-tera-green" />
+              : <WifiOff size={11} className="text-tera-red" />
             }
-            <span className={`text-xs font-semibold ${connected ? 'text-tera-green' : 'text-tera-red'}`}>
-              {connected ? 'Live' : 'Offline'}
+            <span className={`text-xs font-semibold ${connected ? 'text-tera-green' : 'text-tera-red'}`} style={{ fontSize: 10 }}>
+              {connected ? 'Live' : 'Off'}
             </span>
           </div>
         </div>
@@ -110,6 +125,7 @@ export function Sidebar({ firewallMode, connected, activeSessions, activeSection
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon
           const active = activeSection === item.section
+          const isBrowsers = item.section === 'browsers'
           return (
             <button
               key={item.section}
@@ -119,22 +135,40 @@ export function Sidebar({ firewallMode, connected, activeSessions, activeSection
                 paddingInline: 14,
                 paddingBlock: 10,
                 marginBottom: 2,
-                backgroundColor: active ? 'rgba(255,255,255,0.09)' : 'transparent',
+                backgroundColor: active
+                  ? (isBrowsers ? 'rgba(10,132,255,0.15)' : 'rgba(255,255,255,0.09)')
+                  : 'transparent',
                 cursor: 'pointer',
-                border: 'none',
+                border: active && isBrowsers ? '0.5px solid rgba(10,132,255,0.3)' : 'none',
                 outline: 'none',
               }}
             >
               <Icon
                 size={17}
-                className={active ? 'text-tera-text' : 'text-tera-muted'}
+                style={{ color: active ? (isBrowsers ? '#0A84FF' : '#FFFFFF') : '#636366' }}
               />
               <span
-                className="text-sm"
-                style={{ color: active ? '#FFFFFF' : '#636366', fontWeight: active ? 600 : 400 }}
+                className="text-sm flex-1"
+                style={{
+                  color: active ? (isBrowsers ? '#0A84FF' : '#FFFFFF') : '#636366',
+                  fontWeight: active ? 600 : 400,
+                }}
               >
                 {item.label}
               </span>
+              {isBrowsers && (
+                <span
+                  className="text-xs font-bold px-1.5 py-0.5 rounded"
+                  style={{
+                    backgroundColor: 'rgba(10,132,255,0.15)',
+                    color: '#0A84FF',
+                    fontSize: 10,
+                    border: '0.5px solid rgba(10,132,255,0.3)',
+                  }}
+                >
+                  CMD
+                </span>
+              )}
             </button>
           )
         })}
@@ -161,7 +195,7 @@ export function Sidebar({ firewallMode, connected, activeSessions, activeSection
           </div>
           <div className="min-w-0">
             <div className="text-xs font-semibold text-tera-text truncate">Admin</div>
-            <div className="text-xs text-tera-muted truncate">NOC Dashboard</div>
+            <div className="text-xs text-tera-muted truncate">Master Console</div>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator,
@@ -25,7 +25,11 @@ export default function BrowserTab() {
   const { teamId, teamName, teamColor } = useLocalSearchParams<{
     teamId: string; teamName: string; teamColor: string
   }>()
-  const { firewallMode, scores, connected, alert, clearAlert } = useSocket()
+  const {
+    firewallMode, scores, connected, alert, clearAlert,
+    adminPushUrl, clearAdminPush, emitBrowserRegister, emitBrowserState,
+    browserLocked, kicked,
+  } = useSocket()
 
   const [inputUrl, setInputUrl] = useState('https://httpbin.org/get')
   const [currentRelayUrl, setCurrentRelayUrl] = useState(
@@ -37,6 +41,28 @@ export default function BrowserTab() {
 
   const myScore = scores.find(s => s.teamId === teamId)
   const bypassing = firewallMode === 'vulnerable'
+
+  // Register browser with server when socket connects
+  useEffect(() => {
+    if (connected && teamId) emitBrowserRegister(teamId)
+  }, [connected, teamId])
+
+  // Report browser state to admin (debounced)
+  useEffect(() => {
+    if (!connected || !teamId) return
+    const t = setTimeout(() => {
+      emitBrowserState({ teamId, url: inputUrl, title: '', loading })
+    }, 400)
+    return () => clearTimeout(t)
+  }, [inputUrl, loading, connected, teamId])
+
+  // Admin: navigate to pushed URL
+  useEffect(() => {
+    if (adminPushUrl) {
+      navigate(adminPushUrl)
+      clearAdminPush()
+    }
+  }, [adminPushUrl])
 
   function navigate(url: string) {
     const clean = url.trim()
@@ -65,6 +91,23 @@ export default function BrowserTab() {
 
   return (
     <View style={styles.container}>
+      {/* Kicked overlay */}
+      {kicked && (
+        <View style={styles.kickedOverlay}>
+          <Ionicons name="ban-outline" size={52} color={C.red} />
+          <Text style={styles.kickedTitle}>Session Ended</Text>
+          <Text style={styles.kickedBody}>The admin has ended your session.</Text>
+        </View>
+      )}
+
+      {/* Locked banner */}
+      {browserLocked && (
+        <View style={styles.lockedBanner}>
+          <Ionicons name="lock-closed" size={11} color={C.yellow} />
+          <Text style={styles.lockedText}>Browser locked by admin</Text>
+        </View>
+      )}
+
       {/* Alert banner */}
       {alert && (
         <TouchableOpacity style={styles.alertBanner} onPress={clearAlert}>
@@ -114,8 +157,12 @@ export default function BrowserTab() {
           <Ionicons name="chevron-back" size={18} color={C.sub} />
         </TouchableOpacity>
 
-        <View style={styles.urlInputWrapper}>
-          <Ionicons name="lock-closed-outline" size={11} color={C.muted} />
+        <View style={[styles.urlInputWrapper, browserLocked && styles.urlInputLocked]}>
+          <Ionicons
+            name={browserLocked ? 'lock-closed' : 'lock-closed-outline'}
+            size={11}
+            color={browserLocked ? C.yellow : C.muted}
+          />
           <TextInput
             style={styles.urlInput}
             value={inputUrl}
@@ -128,10 +175,15 @@ export default function BrowserTab() {
             selectTextOnFocus
             placeholder="Enter a URL…"
             placeholderTextColor={C.muted}
+            editable={!browserLocked}
           />
         </View>
 
-        <TouchableOpacity style={styles.goBtn} onPress={() => navigate(inputUrl)}>
+        <TouchableOpacity
+          style={[styles.goBtn, browserLocked && { opacity: 0.4 }]}
+          onPress={browserLocked ? undefined : () => navigate(inputUrl)}
+          disabled={browserLocked}
+        >
           {loading
             ? <ActivityIndicator size="small" color="#000000" />
             : <Text style={styles.goBtnText}>Go</Text>
@@ -189,6 +241,22 @@ export default function BrowserTab() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
 
+  kickedOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100,
+    backgroundColor: C.bg,
+    alignItems: 'center', justifyContent: 'center', gap: 12,
+  },
+  kickedTitle: { color: C.text, fontSize: 20, fontWeight: '700', fontFamily: F },
+  kickedBody: { color: C.sub, fontSize: 14, fontFamily: F, textAlign: 'center' },
+
+  lockedBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: 'rgba(255,159,10,0.10)',
+    borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,159,10,0.3)',
+    paddingHorizontal: 14, paddingVertical: 6,
+  },
+  lockedText: { color: C.yellow, fontSize: 11, fontWeight: '600', fontFamily: F },
+
   alertBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: C.yellowBg,
@@ -224,6 +292,10 @@ const styles = StyleSheet.create({
     borderWidth: 0.5, borderColor: C.border,
     borderRadius: R.input,
     paddingHorizontal: 12, paddingVertical: 8,
+  },
+  urlInputLocked: {
+    borderColor: 'rgba(255,159,10,0.4)',
+    backgroundColor: 'rgba(255,159,10,0.06)',
   },
   urlInput: {
     flex: 1, color: C.text, fontSize: 13, fontFamily: F,

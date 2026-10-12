@@ -6,16 +6,18 @@ import { Leaderboard } from './components/Leaderboard'
 import { FirewallControl } from './components/FirewallControl'
 import { ActiveSessions } from './components/ActiveSessions'
 import { JA3Inspector } from './components/JA3Inspector'
+import { BrowserGrid } from './components/BrowserGrid'
 
-export type Section = 'dashboard' | 'traffic' | 'leaderboard' | 'firewall' | 'ja3'
+export type Section = 'browsers' | 'dashboard' | 'traffic' | 'leaderboard' | 'firewall' | 'ja3'
 
 export default function App() {
-  const [section, setSection] = useState<Section>('dashboard')
+  const [section, setSection] = useState<Section>('browsers')
   const {
     firewallMode,
     scores,
     traffic,
     activeSessions,
+    browserStates,
     alert,
     connected,
     clearAlert,
@@ -28,12 +30,15 @@ export default function App() {
     }
   }, [alert])
 
+  const onlineBrowsers = browserStates.filter(b => b.online).length
+
   return (
     <div className="flex h-screen bg-tera-bg overflow-hidden">
       <Sidebar
         firewallMode={firewallMode}
         connected={connected}
         activeSessions={activeSessions.length}
+        onlineBrowsers={onlineBrowsers}
         activeSection={section}
         onNavigate={setSection}
       />
@@ -59,14 +64,19 @@ export default function App() {
         {/* Section content */}
         <div className="flex-1 overflow-hidden">
 
+          {/* ── Browsers (primary) ── */}
+          {section === 'browsers' && (
+            <div className="h-full overflow-hidden">
+              <BrowserGrid browserStates={browserStates} scores={scores} />
+            </div>
+          )}
+
           {/* ── Dashboard ── */}
           {section === 'dashboard' && (
             <div className="h-full grid grid-cols-[1fr_320px] gap-px" style={{ background: 'rgba(84,84,88,0.36)' }}>
-              {/* Traffic feed — full left column */}
               <div className="bg-tera-bg p-5 overflow-hidden flex flex-col">
                 <TrafficFeed entries={traffic} />
               </div>
-              {/* Right column — stacked */}
               <div className="bg-tera-bg flex flex-col overflow-hidden">
                 <div className="flex-1 p-5 overflow-hidden flex flex-col border-b" style={{ borderColor: 'rgba(84,84,88,0.36)' }}>
                   <ActiveSessions sessions={activeSessions} />

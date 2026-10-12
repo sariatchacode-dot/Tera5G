@@ -1,4 +1,4 @@
-import { Team, TrafficEntry, ScoreEntry, FirewallMode } from './types'
+import { Team, TrafficEntry, ScoreEntry, FirewallMode, BrowserState } from './types'
 
 class Store {
   teams: Map<string, Team> = new Map()
@@ -8,6 +8,12 @@ class Store {
   firewallMode: FirewallMode = 'vulnerable'
   readonly adminKey = process.env.ADMIN_KEY ?? 'tera5g-admin-2024'
   firstRelayTeamId: string | null = null
+
+  // Browser management
+  browserStates: Map<string, BrowserState> = new Map()
+  teamSockets: Map<string, string> = new Map()   // teamId → socketId
+  socketTeams: Map<string, string> = new Map()   // socketId → teamId
+  lockedAll: boolean = false
 
   getTeam(id: string): Team | undefined {
     return this.teams.get(id)
@@ -46,6 +52,10 @@ class Store {
     return Array.from(this.teamActivity.entries())
       .filter(([, ts]) => ts > cutoff)
       .map(([id]) => id)
+  }
+
+  getAllBrowserStates(): BrowserState[] {
+    return Array.from(this.browserStates.values())
   }
 }
 

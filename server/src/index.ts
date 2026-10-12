@@ -11,6 +11,7 @@ import { store } from './store'
 import { tickActiveRelayers, awardFirstRelay, awardRelayRequest } from './scoring'
 import { startProxyServer } from './proxy'
 import http from 'http'
+import { BrowserState } from './types'
 
 const app = express()
 const httpServer = createServer(app)
@@ -304,13 +305,165 @@ app.get('/api/status', (_req, res) => res.json({
   traffic: store.trafficLog.length,
 }))
 
+// ── Admin browser management ──────────────────────────────────────────────────
+
+app.post('/api/admin/push-url', (req, res) => {
+  const { adminKey, teamId, url } = req.body as { adminKey?: string; teamId?: string; url?: string }
+  if (adminKey !== store.adminKey) return res.status(403).json({ error: 'Invalid admin key' })
+  if (!url) return res.status(400).json({ error: 'url required' })
+  if (teamId) {
+    const socketId = store.teamSockets.get(teamId)
+    if (!socketId) return res.status(404).json({ error: 'Team browser not connected' })
+    io.to(socketId).emit('admin:push_url', { url })
+  } else {
+    io.emit('admin:push_url', { url })
+  }
+  return res.json({ ok: true })
+})
+
+app.post('/api/admin/announce', (req, res) => {
+  const { adminKey, teamId, message, type = 'info' } = req.body as {
+    adminKey?: string; teamId?: string; message?: string; type?: string
+  }
+  if (adminKey !== store.adminKey) return res.status(403).json({ error: 'Invalid admin key' })
+  if (!message) return res.status(400).json({ error: 'message required' })
+  const payload = { message, type }
+  if (teamId) {
+    const socketId = store.teamSockets.get(teamId)
+    if (socketId) io.to(socketId).emit('admin:announce', payload)
+  } else {
+    io.emit('admin:announce', payload)
+  }
+  return res.json({ ok: true })
+})
+
+app.post('/api/admin/kick', (req, res) => {
+  const { adminKey, teamId } = req.body as { adminKey?: string; teamId?: string }
+  if (adminKey !== store.adminKey) return res.status(403).json({ error: 'Invalid admin key' })
+  if (!teamId) return res.status(400).json({ error: 'teamId required' })
+  const socketId = store.teamSockets.get(teamId)
+  if (socketId) io.to(socketId).emit('admin:kicked', { message: 'You have been removed by the admin.' })
+  store.teams.delete(teamId)
+  store.scores.delete(teamId)
+  store.teamActivity.delete(teamId)
+  store.browserStates.delete(teamId)
+  store.teamSockets.delete(teamId)
+  if (socketId) store.socketTeams.delete(socketId)
+  broadcastScores()
+  broadcastActive()
+  io.emit('browser_states', store.getAllBrowserStates())
+  io.emit('team_kicked', { teamId })
+  return res.json({ ok: true })
+})
+
+app.post('/api/admin/reset-scores', (req, res) => {
+  const { adminKey, teamId } = req.body as { adminKey?: string; teamId?: string }
+  if (adminKey !== store.adminKey) return res.status(403).json({ error: 'Invalid admin key' })
+  if (teamId) {
+    const team = store.getTeam(teamId)
+    if (!team) return res.status(404).json({ error: 'Team not found' })
+    store.scores.set(teamId, {
+      teamId, teamName: team.name, color: team.color,
+      totalPoints: 0, activeSeconds: 0, connectionsAttempted: 0,
+      connectionsAllowed: 0, longestSession: 0, firstConnectBonus: false,
+    })
+  } else {
+    store.firstRelayTeamId = null
+    for (const [id, team] of store.teams.entries()) {
+      store.scores.set(id, {
+        teamId: id, teamName: team.name, color: team.color,
+        totalPoints: 0, activeSeconds: 0, connectionsAttempted: 0,
+        connectionsAllowed: 0, longestSession: 0, firstConnectBonus: false,
+      })
+    }
+  }
+  broadcastScores()
+  return res.json({ ok: true })
+})
+
+app.post('/api/admin/lock', (req, res) => {
+  const { adminKey, teamId, locked } = req.body as {
+    adminKey?: string; teamId?: string; locked?: boolean
+  }
+  if (adminKey !== store.adminKey) return res.status(403).json({ error: 'Invalid admin key' })
+  if (locked === undefined) return res.status(400).json({ error: 'locked required' })
+
+  const applyLock = (id: string) => {
+    const state = store.browserStates.get(id)
+    if (state) { state.locked = locked; store.browserStates.set(id, state) }
+    const sid = store.teamSockets.get(id)
+    if (sid) io.to(sid).emit('admin:lock', { locked })
+  }
+
+  if (teamId) {
+    applyLock(teamId)
+  } else {
+    store.lockedAll = locked
+    for (const id of store.teams.keys()) applyLock(id)
+  }
+  io.emit('browser_states', store.getAllBrowserStates())
+  return res.json({ ok: true })
+})
+
 // ── Socket.io bootstrap ───────────────────────────────────────────────────────
 
 io.on('connection', socket => {
   socket.emit('firewall_mode', store.firewallMode)
   socket.emit('scores', store.getAllScores())
   socket.emit('traffic_history', store.getRecentTraffic(30))
+  socket.emit('browser_states', store.getAllBrowserStates())
   broadcastActive()
+
+  // ── Browser state tracking ───────────────────────────────────────────────
+  socket.on('browser:register', ({ teamId }: { teamId: string }) => {
+    // Evict old socket mapping for this team
+    const oldSid = store.teamSockets.get(teamId)
+    if (oldSid) store.socketTeams.delete(oldSid)
+    store.teamSockets.set(teamId, socket.id)
+    store.socketTeams.set(socket.id, teamId)
+
+    const team = store.getTeam(teamId)
+    if (team) {
+      const existing = store.browserStates.get(teamId)
+      store.browserStates.set(teamId, {
+        teamId, teamName: team.name, teamColor: team.color,
+        url: existing?.url ?? '', title: existing?.title ?? '',
+        loading: false, lastUpdated: Date.now(),
+        locked: existing?.locked ?? store.lockedAll, online: true,
+      })
+      io.emit('browser_states', store.getAllBrowserStates())
+      const state = store.browserStates.get(teamId)
+      if (state?.locked) socket.emit('admin:lock', { locked: true })
+    }
+  })
+
+  socket.on('browser:state', (data: { teamId: string; url: string; title: string; loading: boolean }) => {
+    const team = store.getTeam(data.teamId)
+    if (!team) return
+    const existing = store.browserStates.get(data.teamId)
+    const updated: BrowserState = {
+      teamId: data.teamId, teamName: team.name, teamColor: team.color,
+      url: data.url, title: data.title, loading: data.loading,
+      lastUpdated: Date.now(), locked: existing?.locked ?? false, online: true,
+    }
+    store.browserStates.set(data.teamId, updated)
+    io.emit('browser_state_update', updated)
+  })
+
+  socket.on('disconnect', () => {
+    const teamId = store.socketTeams.get(socket.id)
+    if (teamId) {
+      store.teamSockets.delete(teamId)
+      store.socketTeams.delete(socket.id)
+      const state = store.browserStates.get(teamId)
+      if (state) {
+        state.online = false
+        state.loading = false
+        store.browserStates.set(teamId, state)
+        io.emit('browser_state_update', state)
+      }
+    }
+  })
 })
 
 // ── Score ticker ──────────────────────────────────────────────────────────────
