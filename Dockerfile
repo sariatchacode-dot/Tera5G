@@ -25,7 +25,15 @@ RUN printf 'const React=require("react");const {View}=require("react-native");\n
 COPY mobile/ mobile/
 RUN cd mobile && npx expo export --platform web
 
-# ── Stage 3: Production runtime ───────────────────────────────────────────────
+# ── Stage 3: Build admin dashboard ───────────────────────────────────────────
+FROM node:20-alpine AS admin-build
+WORKDIR /build
+COPY web/package*.json web/
+RUN cd web && npm install
+COPY web/ web/
+RUN cd web && npm run build
+
+# ── Stage 4: Production runtime ───────────────────────────────────────────────
 FROM node:20-alpine
 WORKDIR /app
 
@@ -34,6 +42,7 @@ RUN cd server && npm install --omit=dev && npm cache clean --force
 
 COPY --from=server-build /build/server/dist server/dist
 COPY --from=web-build   /build/mobile/dist  server/public
+COPY --from=admin-build /build/web/dist     server/public/admin
 
 RUN addgroup -g 1001 -S nodejs && \
     adduser  -S nodejs -u 1001 && \

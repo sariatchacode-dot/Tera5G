@@ -9,7 +9,7 @@ interface Props {
 export function JA3Inspector({ entries }: Props) {
   const [selected, setSelected] = useState<TrafficEntry | null>(null)
 
-  const withDetails = entries.filter(e => e.decision.ja3String)
+  const withDetails = entries.filter(e => e.ja3Hash && e.ja3Hash !== 'n/a')
 
   return (
     <div className="flex flex-col h-full">
@@ -28,7 +28,7 @@ export function JA3Inspector({ entries }: Props) {
 
         {withDetails.slice(0, 20).map(e => {
           const isOpen = selected?.id === e.id
-          const blocked = e.decision.ja3Blocked
+          const blocked = !e.decision.allowed
 
           return (
             <div

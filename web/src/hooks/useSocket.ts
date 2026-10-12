@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { FirewallMode, TrafficEntry, ScoreEntry, ActiveTeamInfo } from '../types'
 
-const SERVER = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3001'
+const SERVER = import.meta.env.VITE_SERVER_URL ?? (import.meta.env.DEV ? 'http://localhost:3001' : '')
 
 interface SocketState {
   firewallMode: FirewallMode

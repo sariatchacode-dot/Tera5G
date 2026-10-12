@@ -323,11 +323,19 @@ setInterval(() => {
 const publicDir = path.join(__dirname, '..', 'public')
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir, { index: 'index.html' }))
-  // SPA fallback — Expo Router client-side navigation
+
+  // SPA fallback for admin dashboard at /admin/*
+  const adminIndex = path.join(publicDir, 'admin', 'index.html')
+  app.get(/^\/admin(\/.*)?$/, (_req, res) => {
+    if (fs.existsSync(adminIndex)) res.sendFile(adminIndex)
+    else res.status(404).send('Admin build not found.')
+  })
+
+  // SPA fallback for user app (Expo Router)
   app.get(/^(?!\/api\/).*$/, (_req, res) => {
     const index = path.join(publicDir, 'index.html')
     if (fs.existsSync(index)) res.sendFile(index)
-    else res.status(404).send('Web build not found. Run npm run build first.')
+    else res.status(404).send('Web build not found.')
   })
 }
 

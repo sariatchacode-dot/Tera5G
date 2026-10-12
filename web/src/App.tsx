@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useSocket } from './hooks/useSocket'
 import { Sidebar } from './components/Header'
 import { TrafficFeed } from './components/TrafficFeed'
@@ -7,7 +7,10 @@ import { FirewallControl } from './components/FirewallControl'
 import { ActiveSessions } from './components/ActiveSessions'
 import { JA3Inspector } from './components/JA3Inspector'
 
+export type Section = 'dashboard' | 'traffic' | 'leaderboard' | 'firewall' | 'ja3'
+
 export default function App() {
+  const [section, setSection] = useState<Section>('dashboard')
   const {
     firewallMode,
     scores,
@@ -27,19 +30,19 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-tera-bg overflow-hidden">
-      {/* Sidebar */}
       <Sidebar
         firewallMode={firewallMode}
         connected={connected}
         activeSessions={activeSessions.length}
+        activeSection={section}
+        onNavigate={setSection}
       />
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Alert banner */}
         {alert && (
           <div
-            className={`px-6 py-3 text-sm font-medium flex items-center justify-between border-b border-ios flex-shrink-0
+            className={`px-6 py-3 text-sm font-medium flex items-center justify-between border-b flex-shrink-0
               ${alert.type === 'patched'
                 ? 'bg-tera-green/10 border-tera-green/30 text-tera-green'
                 : 'bg-tera-red/10 border-tera-red/30 text-tera-red'
@@ -48,43 +51,65 @@ export default function App() {
             <span>{alert.message}</span>
             <button
               onClick={clearAlert}
-              className="text-xs opacity-60 hover:opacity-100 transition-opacity"
+              className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-4"
             >✕</button>
           </div>
         )}
 
-        {/* Dashboard grid */}
-        <div className="flex-1 grid grid-cols-[1fr_300px] grid-rows-[1fr_260px] gap-px overflow-hidden"
-          style={{ background: 'rgba(84,84,88,0.36)' }}>
+        {/* Section content */}
+        <div className="flex-1 overflow-hidden">
 
-          {/* Traffic feed — tall left column */}
-          <div className="row-span-2 bg-tera-bg p-5 overflow-hidden flex flex-col">
-            <TrafficFeed entries={traffic} />
-          </div>
-
-          {/* Top-right: Active tunnels + Leaderboard */}
-          <div className="bg-tera-bg p-5 overflow-hidden flex flex-col">
-            <div className="grid grid-cols-2 gap-4 h-full overflow-hidden">
-              <div className="overflow-hidden flex flex-col">
-                <ActiveSessions sessions={activeSessions} />
+          {/* ── Dashboard ── */}
+          {section === 'dashboard' && (
+            <div className="h-full grid grid-cols-[1fr_320px] gap-px" style={{ background: 'rgba(84,84,88,0.36)' }}>
+              {/* Traffic feed — full left column */}
+              <div className="bg-tera-bg p-5 overflow-hidden flex flex-col">
+                <TrafficFeed entries={traffic} />
               </div>
-              <div className="overflow-hidden flex flex-col">
+              {/* Right column — stacked */}
+              <div className="bg-tera-bg flex flex-col overflow-hidden">
+                <div className="flex-1 p-5 overflow-hidden flex flex-col border-b" style={{ borderColor: 'rgba(84,84,88,0.36)' }}>
+                  <ActiveSessions sessions={activeSessions} />
+                </div>
+                <div className="flex-1 p-5 overflow-hidden flex flex-col">
+                  <Leaderboard scores={scores} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Traffic ── */}
+          {section === 'traffic' && (
+            <div className="h-full bg-tera-bg p-6 overflow-hidden flex flex-col">
+              <TrafficFeed entries={traffic} />
+            </div>
+          )}
+
+          {/* ── Leaderboard ── */}
+          {section === 'leaderboard' && (
+            <div className="h-full bg-tera-bg p-6 overflow-y-auto">
+              <div className="max-w-xl mx-auto">
                 <Leaderboard scores={scores} />
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Bottom-right: Firewall control + JA3 Inspector */}
-          <div className="bg-tera-bg p-5 overflow-hidden">
-            <div className="grid grid-cols-2 gap-4 h-full overflow-hidden">
-              <div className="overflow-y-auto">
+          {/* ── Firewall ── */}
+          {section === 'firewall' && (
+            <div className="h-full bg-tera-bg p-6 overflow-y-auto">
+              <div className="max-w-md mx-auto">
                 <FirewallControl mode={firewallMode} />
               </div>
-              <div className="overflow-hidden flex flex-col">
-                <JA3Inspector entries={traffic} />
-              </div>
             </div>
-          </div>
+          )}
+
+          {/* ── JA3 Inspector ── */}
+          {section === 'ja3' && (
+            <div className="h-full bg-tera-bg p-6 overflow-hidden flex flex-col">
+              <JA3Inspector entries={traffic} />
+            </div>
+          )}
+
         </div>
       </div>
     </div>

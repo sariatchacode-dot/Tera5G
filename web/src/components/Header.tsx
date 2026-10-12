@@ -1,21 +1,24 @@
 import { Wifi, WifiOff, ShieldCheck, ShieldAlert, Radio, Trophy, Info, LayoutDashboard } from 'lucide-react'
 import { FirewallMode } from '../types'
+import { Section } from '../App'
 
 interface Props {
   firewallMode: FirewallMode
   connected: boolean
   activeSessions: number
+  activeSection: Section
+  onNavigate: (s: Section) => void
 }
 
-const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Dashboard' },
-  { icon: Radio,           label: 'Traffic' },
-  { icon: Trophy,          label: 'Leaderboard' },
-  { icon: ShieldAlert,     label: 'Firewall' },
-  { icon: Info,            label: 'JA3' },
+const NAV_ITEMS: { icon: React.ElementType; label: string; section: Section }[] = [
+  { icon: LayoutDashboard, label: 'Dashboard', section: 'dashboard' },
+  { icon: Radio,           label: 'Traffic',   section: 'traffic'   },
+  { icon: Trophy,          label: 'Leaderboard', section: 'leaderboard' },
+  { icon: ShieldAlert,     label: 'Firewall',  section: 'firewall'  },
+  { icon: Info,            label: 'JA3',       section: 'ja3'       },
 ]
 
-export function Sidebar({ firewallMode, connected, activeSessions }: Props) {
+export function Sidebar({ firewallMode, connected, activeSessions, activeSection, onNavigate }: Props) {
   const isVulnerable = firewallMode === 'vulnerable'
 
   return (
@@ -46,10 +49,7 @@ export function Sidebar({ firewallMode, connected, activeSessions }: Props) {
       </div>
 
       {/* Status indicators */}
-      <div
-        className="flex flex-col gap-2"
-        style={{ padding: '14px 14px 8px' }}
-      >
+      <div className="flex flex-col gap-2" style={{ padding: '14px 14px 8px' }}>
         {/* Firewall state */}
         <div
           className="flex items-center gap-2.5 rounded-ios"
@@ -107,18 +107,22 @@ export function Sidebar({ firewallMode, connected, activeSessions }: Props) {
 
       {/* Nav items */}
       <nav className="flex-1" style={{ paddingInline: 8 }}>
-        {NAV_ITEMS.map((item, idx) => {
+        {NAV_ITEMS.map((item) => {
           const Icon = item.icon
-          const active = idx === 0
+          const active = activeSection === item.section
           return (
-            <div
-              key={item.label}
-              className="flex items-center gap-3 rounded-ios cursor-default"
+            <button
+              key={item.section}
+              onClick={() => onNavigate(item.section)}
+              className="w-full flex items-center gap-3 rounded-ios text-left transition-colors hover:bg-white/5"
               style={{
                 paddingInline: 14,
                 paddingBlock: 10,
                 marginBottom: 2,
                 backgroundColor: active ? 'rgba(255,255,255,0.09)' : 'transparent',
+                cursor: 'pointer',
+                border: 'none',
+                outline: 'none',
               }}
             >
               <Icon
@@ -131,7 +135,7 @@ export function Sidebar({ firewallMode, connected, activeSessions }: Props) {
               >
                 {item.label}
               </span>
-            </div>
+            </button>
           )
         })}
       </nav>

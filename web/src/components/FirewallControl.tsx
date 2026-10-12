@@ -109,28 +109,28 @@ export function FirewallControl({ mode }: Props) {
         <button
           onClick={() => setMode('vulnerable')}
           disabled={loading || mode === 'vulnerable'}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ios text-xs font-semibold transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ios text-xs font-semibold transition-all disabled:cursor-not-allowed"
           style={{
-            color: '#FF453A',
-            backgroundColor: 'rgba(255,69,58,0.10)',
-            border: '0.5px solid rgba(255,69,58,0.40)',
+            color: mode === 'vulnerable' ? 'rgba(255,69,58,0.40)' : '#FF453A',
+            backgroundColor: mode === 'vulnerable' ? 'rgba(255,69,58,0.04)' : 'rgba(255,69,58,0.10)',
+            border: `0.5px solid ${mode === 'vulnerable' ? 'rgba(255,69,58,0.20)' : 'rgba(255,69,58,0.40)'}`,
           }}
         >
           {loading ? <Loader2 size={12} className="animate-spin" /> : <ShieldAlert size={12} />}
-          Set Vulnerable
+          {mode === 'vulnerable' ? 'Active' : 'Set Vulnerable'}
         </button>
         <button
           onClick={() => setMode('patched')}
           disabled={loading || mode === 'patched'}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ios text-xs font-semibold transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ios text-xs font-semibold transition-all disabled:cursor-not-allowed"
           style={{
-            color: '#1DB814',
-            backgroundColor: 'rgba(29,184,20,0.10)',
-            border: '0.5px solid rgba(29,184,20,0.40)',
+            color: mode === 'patched' ? 'rgba(29,184,20,0.40)' : '#1DB814',
+            backgroundColor: mode === 'patched' ? 'rgba(29,184,20,0.04)' : 'rgba(29,184,20,0.10)',
+            border: `0.5px solid ${mode === 'patched' ? 'rgba(29,184,20,0.20)' : 'rgba(29,184,20,0.40)'}`,
           }}
         >
           {loading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
-          Apply Patch
+          {mode === 'patched' ? 'Active' : 'Apply Patch'}
         </button>
       </div>
 
